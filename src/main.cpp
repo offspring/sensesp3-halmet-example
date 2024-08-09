@@ -68,6 +68,7 @@
 #include <sensesp/transforms/curveinterpolator.h>
 #include <sensesp/transforms/lambda_transform.h>
 #include <sensesp/transforms/linear.h>
+#include <sensesp/transforms/moving_average.h>
 #include <sensesp/transforms/time_counter.h>
 #include <sensesp/ui/ui_controls.h>
 #include <sensesp_onewire/onewire_temperature.h>
@@ -613,6 +614,12 @@ void setup() {
         new sensesp::SKMetadata("", "Main Engine State")));
 #endif
 
+    auto* d1_tacho_frequency_avg = new sensesp::MovingAverage(10);
+    auto* d1_engine_rpm = new sensesp::LambdaTransform<float, float>(
+        [](float value) -> float { return value * 60; });
+    d1_tacho_frequency->connect_to(d1_tacho_frequency_avg)
+        ->connect_to(d1_engine_rpm);
+
 #ifdef ENABLE_NMEA2000_OUTPUT
     if (enable_n2k_output->get_value()) {
       // Create the NMEA 2000 sender objects when enabled
@@ -623,16 +630,14 @@ void setup() {
       n2k_engine_rapid_sender->set_sort_order(510);
 
       // Connect outputs to the N2k senders.
-      d1_tacho_frequency->connect_to(
+      d1_engine_rpm->connect_to(
           &(n2k_engine_rapid_sender->engine_speed_consumer_));
     }
 #endif
 
     if (display_present) {
-      d1_tacho_frequency->connect_to(
-          new sensesp::LambdaConsumer<float>([display](float value) {
-            PrintValue(display, 3, "RPM D1", 60 * value);
-          }));
+      d1_engine_rpm->connect_to(new sensesp::LambdaConsumer<float>(
+          [display](float value) { PrintValue(display, 3, "RPM D1", value); }));
     }
   }
 

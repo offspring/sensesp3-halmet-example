@@ -70,11 +70,8 @@ class N2kEngineParameterRapidSender : public N2kSender {
     });
   }
 
-  sensesp::LambdaConsumer<double> engine_speed_consumer_{[this](double value) {
-    // Internally we measure engine speed in Hz (revolutions per
-    // second) but NMEA 2000 rpm.
-    this->engine_speed_.update(60 * value);
-  }};
+  sensesp::LambdaConsumer<double> engine_speed_consumer_{
+      [this](double value) { this->engine_speed_.update(value); }};
 
   sensesp::LambdaConsumer<double> engine_boost_pressure_consumer_{
       [this](double value) { this->engine_boost_pressure_.update(value); }};

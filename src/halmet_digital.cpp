@@ -18,9 +18,8 @@
 
 namespace {
 
-// Default RPM count scale factor, corresponds to 100 pulses per revolution.
-// This is rarely, if ever correct.
-constexpr float kDefaultFrequencyScale = 1 / 100.;
+// Default RPM count scale factor.
+constexpr float kDefaultFrequencyScale = 1.0;
 
 }  // namespace
 
@@ -33,6 +32,12 @@ sensesp::FloatProducer* TachoDigitalSender(int pin, const String& path_prefix,
 #endif
 
   auto* tacho_input = new sensesp::DigitalInputCounter(pin, INPUT, RISING, 500);
+
+#if 0
+  tacho_input->attach([path_prefix, tacho_input]() {
+    debugD("Input %s counter: %d", path_prefix.c_str(), tacho_input->get());
+  });
+#endif
 
   config_path = "/" + path_prefix + "/Revolution Multiplier";
 
@@ -57,12 +62,6 @@ sensesp::FloatProducer* TachoDigitalSender(int pin, const String& path_prefix,
   tacho_frequency_sk_output->set_sort_order(sort_order_base + 200);
 
   tacho_frequency->connect_to(tacho_frequency_sk_output);
-#endif
-
-#if 0
-  tacho_input->attach([path_prefix, tacho_input]() {
-    debugD("Input %s counter: %d", path_prefix.c_str(), tacho_input->get());
-  });
 #endif
 
   return tacho_frequency;
