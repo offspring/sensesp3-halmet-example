@@ -1,12 +1,14 @@
 #ifndef __SRC_HALMET_DIGITAL_H__
 #define __SRC_HALMET_DIGITAL_H__
 
-#include "sensesp/sensors/sensor.h"
+#include <WString.h>
 
-using namespace sensesp;
+#include <sensesp/system/valueproducer.h>
 
-FloatProducer* ConnectTachoSender(int pin, String path_prefix, String sk_name,
-                                  int sort_order_base);
-BoolProducer* ConnectAlarmSender(int pin, String name, int sort_order_base);
+sensesp::FloatProducer* TachoDigitalSender(int pin, const String& path_prefix,
+                                           const String& sk_name,
+                                           int sort_order_base);
+sensesp::BoolProducer* AlarmDigitalSender(int pin, const String& name,
+                                          int sort_order_base);
 
 #endif

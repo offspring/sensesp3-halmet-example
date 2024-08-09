@@ -1,6 +1,18 @@
 #ifndef HALMET_SRC_EXPIRING_VALUE_H_
 #define HALMET_SRC_EXPIRING_VALUE_H_
 
+#include <Arduino.h>
+
+#include <cstdint>
+
+namespace sensesp {
+
+/**
+ * @brief Keep value from update till expiration duration else return expired
+ * value.
+ *
+ * @tparam T
+ */
 template <typename T>
 class ExpiringValue {
  public:
@@ -8,10 +20,9 @@ class ExpiringValue {
       : value_{},
         expiration_duration_{1000},
         last_update_{0},
-        expired_value_{T{}}
-      {}
+        expired_value_{T{}} {}
 
-  ExpiringValue(T value, unsigned long expiration_duration, T expired_value)
+  ExpiringValue(T value, uint64_t expiration_duration, T expired_value)
       : value_{value},
         expiration_duration_{expiration_duration},
         expired_value_{expired_value},
@@ -37,8 +48,10 @@ class ExpiringValue {
  private:
   T value_;
   T expired_value_;
-  unsigned long expiration_duration_;
-  unsigned long last_update_;
+  uint64_t expiration_duration_;
+  uint64_t last_update_;
 };
 
-#endif  // HALMET_SRC_EXPIRING_VALUE_H_
+}  // namespace sensesp
+
+#endif

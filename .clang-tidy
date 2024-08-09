@@ -1,0 +1,55 @@
+WarningsAsErrors: ''
+
+CheckOptions:
+ - { key: readability-identifier-naming.PrivateMemberPrefix, value: d_ }
+ - { key: cppcoreguidelines-special-member-functions.AllowSoleDefaultDtor, value: '1' }
+ - { key: cppcoreguidelines-special-member-functions.AllowMissingMoveFunctions, value: '0' }
+ - { key: cppcoreguidelines-special-member-functions.AllowMissingMoveFunctionsWhenCopyIsDeleted, value: '0' }
+ - { key: modernize-make-shared.MakeSmartPtrFunction, value: 'std::make_shared' }
+ - { key: modernize-make-shared.MakeSmartPtrFunctionHeader, value: bsl_memory.h }
+ - { key: modernize-make-unique.MakeSmartPtrFunction, value: 'std::make_unique' }
+ - { key: modernize-make-unique.MakeSmartPtrFunctionHeader, value: bsl_memory.h }
+
+Checks: >
+    -clang-analyzer-*,
+    -clang-diagnostic-*,
+    bugprone-*,
+    cppcoreguidelines-*,
+    -cppcoreguidelines-avoid-c-arrays,
+    -cppcoreguidelines-avoid-magic-numbers,
+    -cppcoreguidelines-bugprone-reserved-identifier,
+    -cppcoreguidelines-macro-usage,
+    -cppcoreguidelines-owning-memory,
+    -cppcoreguidelines-pro-bounds-array-to-pointer-decay,
+    -cppcoreguidelines-pro-bounds-constant-array-index,
+    -cppcoreguidelines-pro-type-member-init,
+    -cppcoreguidelines-pro-type-static-cast-downcast,
+    -cppcoreguidelines-pro-type-union-access,
+    -cppcoreguidelines-avoid-non-const-global-variables,
+    google-build-namespaces,
+    -google-explicit-constructor,
+    misc-*,
+    -misc-include-cleaner,
+    -misc-unused-parameters,
+    modernize-*,
+    -modernize-avoid-c-arrays,
+    -modernize-concat-nested-namespaces,
+    -modernize-pass-by-value,
+    -modernize-raw-string-literal,
+    -modernize-use-default-member-init,
+    -modernize-use-nodiscard,
+    -modernize-use-trailing-return-type,
+    performance-*,
+    readability-*,
+    -readability-avoid-const-params-in-decls,
+    -readability-convert-member-functions-to-static,
+    -readability-delete-null-pointer,
+    -readability-else-after-return,
+    -readability-identifier-length,
+    -readability-identifier-naming,
+    -readability-implicit-bool-cast,
+    -readability-isolate-declaration,
+    -readability-magic-numbers,
+    -readability-named-parameter,
+    -readability-redundant-member-init,
+    -readability-simplify-boolean-expr

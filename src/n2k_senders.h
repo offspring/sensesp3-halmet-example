@@ -1,34 +1,39 @@
 #ifndef HALMET_SRC_N2K_SENDERS_H_
 #define HALMET_SRC_N2K_SENDERS_H_
 
+#ifdef ENABLE_NMEA2000_OUTPUT
+#include "expiring_value.h"
+
 #include <N2kMessages.h>
 #include <NMEA2000.h>
 
-#include "expiring_value.h"
-#include "sensesp/system/configurable.h"
-#include "sensesp/system/lambda_consumer.h"
+#include <sensesp/system/configurable.h>
+#include <sensesp/system/lambda_consumer.h>
+#include <sensesp/system/local_debug.h>
 
-namespace sensesp {
+#include <cstdint>
+
+namespace halmet {
 
 /**
  * @brief Base class for NMEA 2000 senders.
  *
  */
-class N2kSender : public Configurable {
+class N2kSender : public sensesp::Configurable {
  public:
-  N2kSender(String config_path) : Configurable{config_path} {}
+  N2kSender(const String& config_path) : sensesp::Configurable{config_path} {}
 
   virtual void enable() = 0;
 
   void disable() {
     if (this->sender_reaction_ != nullptr) {
-      ReactESP::app->remove(this->sender_reaction_);
+      reactesp::ReactESP::app->remove(this->sender_reaction_);
       this->sender_reaction_ = nullptr;
     }
   }
 
  protected:
-  RepeatReaction* sender_reaction_ = nullptr;
+  sensesp::RepeatReaction* sender_reaction_ = nullptr;
 };
 
 /**
@@ -37,8 +42,9 @@ class N2kSender : public Configurable {
  */
 class N2kEngineParameterRapidSender : public N2kSender {
  public:
-  N2kEngineParameterRapidSender(String config_path, uint8_t engine_instance,
-                                tNMEA2000* nmea2000, bool enable = true)
+  N2kEngineParameterRapidSender(const String& config_path,
+                                uint8_t engine_instance, tNMEA2000* nmea2000,
+                                bool enable = true)
       : N2kSender{config_path},
         engine_instance_{engine_instance},
         nmea2000_{nmea2000},
@@ -53,10 +59,10 @@ class N2kEngineParameterRapidSender : public N2kSender {
   }
 
   void enable() override {
-    ReactESP::app->onRepeat(repeat_interval_, [this]() {
+    reactesp::ReactESP::app->onRepeat(repeat_interval_, [this]() {
       tN2kMsg N2kMsg;
-      // At the moment, the PGN is sent regardless of whether all the values
-      // are invalid or not.
+      // At the moment, the PGN is sent regardless of whether all the
+      // values are invalid or not.
       SetN2kEngineParamRapid(
           N2kMsg, this->engine_instance_, this->engine_speed_.get(),
           this->engine_boost_pressure_.get(), this->engine_tilt_trim_.get());
@@ -64,17 +70,19 @@ class N2kEngineParameterRapidSender : public N2kSender {
     });
   }
 
-  LambdaConsumer<double> engine_speed_consumer_{[this](double value) {
-    // Internally we measure engine speed in Hz (revolutions per second) but
-    // NMEA 2000 rpm.
+  sensesp::LambdaConsumer<double> engine_speed_consumer_{[this](double value) {
+    // Internally we measure engine speed in Hz (revolutions per
+    // second) but NMEA 2000 rpm.
     this->engine_speed_.update(60 * value);
   }};
-  LambdaConsumer<double> engine_boost_pressure_consumer_{
+
+  sensesp::LambdaConsumer<double> engine_boost_pressure_consumer_{
       [this](double value) { this->engine_boost_pressure_.update(value); }};
-  LambdaConsumer<int8_t> engine_tilt_trim_consumer_{
+
+  sensesp::LambdaConsumer<int8_t> engine_tilt_trim_consumer_{
       [this](int8_t value) { this->engine_tilt_trim_.update(value); }};
 
-  virtual String get_config_schema() override {
+  String get_config_schema() override {
     return R"###({
     "type": "object",
     "properties": {
@@ -83,12 +91,14 @@ class N2kEngineParameterRapidSender : public N2kSender {
   })###";
   }
 
-  virtual bool set_configuration(const JsonObject& config) override {
-    String expected[] = {"engine_instance"};
-    for (auto str : expected) {
+  bool set_configuration(const JsonObject& config) override {
+    const String expected[] = {"engine_instance"};
+    for (const auto& str : expected) {
       if (!config.containsKey(str)) {
-        debugE("N2kEngineParameterRapidSender: Missing configuration key %s",
-               str.c_str());
+        debugE(
+            "N2kEngineParameterRapidSender: Missing configuration key "
+            "%s",
+            str.c_str());
         return false;
       }
     }
@@ -96,19 +106,19 @@ class N2kEngineParameterRapidSender : public N2kSender {
     return true;
   }
 
-  virtual void get_configuration(JsonObject& config) override {
+  void get_configuration(JsonObject& config) override {
     config["engine_instance"] = engine_instance_;
   }
 
  protected:
-  unsigned int repeat_interval_;
-  unsigned int expiry_;
+  uint32_t repeat_interval_;
+  uint32_t expiry_;
   tNMEA2000* nmea2000_;
 
   uint8_t engine_instance_;
-  ExpiringValue<double> engine_speed_;
-  ExpiringValue<double> engine_boost_pressure_;
-  ExpiringValue<int8_t> engine_tilt_trim_;
+  sensesp::ExpiringValue<double> engine_speed_;
+  sensesp::ExpiringValue<double> engine_boost_pressure_;
+  sensesp::ExpiringValue<int8_t> engine_tilt_trim_;
 };
 
 /**
@@ -117,8 +127,9 @@ class N2kEngineParameterRapidSender : public N2kSender {
  */
 class N2kEngineParameterDynamicSender : public N2kSender {
  public:
-  N2kEngineParameterDynamicSender(String config_path, uint8_t engine_instance,
-                                  tNMEA2000* nmea2000, bool enable = true)
+  N2kEngineParameterDynamicSender(const String& config_path,
+                                  uint8_t engine_instance, tNMEA2000* nmea2000,
+                                  bool enable = true)
       : N2kSender{config_path},
         engine_instance_{engine_instance},
         nmea2000_{nmea2000},
@@ -126,14 +137,15 @@ class N2kEngineParameterDynamicSender : public N2kSender {
         expiry_{5000},          // In ms. When the inputs expire.
         oil_pressure_{N2kDoubleNA, expiry_, N2kDoubleNA},
         oil_temperature_{N2kDoubleNA, expiry_, N2kDoubleNA},
-        temperature_{N2kDoubleNA, expiry_, N2kDoubleNA},
-        alternator_potential_{N2kDoubleNA, expiry_, N2kDoubleNA},
+        coolant_temperature_{N2kDoubleNA, expiry_, N2kDoubleNA},
+        alternator_voltage_{N2kDoubleNA, expiry_, N2kDoubleNA},
         fuel_rate_{N2kDoubleNA, expiry_, N2kDoubleNA},
         total_engine_hours_{N2kDoubleNA, expiry_, N2kDoubleNA},
         coolant_pressure_{N2kDoubleNA, expiry_, N2kDoubleNA},
         fuel_pressure_{N2kDoubleNA, expiry_, N2kDoubleNA},
         engine_load_{N2kInt8NA, expiry_, N2kInt8NA},
         engine_torque_{N2kInt8NA, expiry_, N2kInt8NA},
+        // Status bits 1
         check_engine_{false, expiry_, false},
         over_temperature_{false, expiry_, false},
         low_oil_pressure_{false, expiry_, false},
@@ -152,7 +164,8 @@ class N2kEngineParameterDynamicSender : public N2kSender {
         emergency_stop_{false, expiry_, false},
         warning_level_1_{false, expiry_, false},
         warning_level_2_{false, expiry_, false},
-        power_reduction_{false, expiry_, false},
+        // Status bits 2
+        low_oi_power_reduction_{false, expiry_, false},
         maintenance_needed_{false, expiry_, false},
         engine_comm_error_{false, expiry_, false},
         sub_or_secondary_throttle_{false, expiry_, false},
@@ -163,15 +176,15 @@ class N2kEngineParameterDynamicSender : public N2kSender {
     }
   }
 
-  void enable() {
+  void enable() override {
     if (this->sender_reaction_ == nullptr) {
       this->sender_reaction_ =
-          ReactESP::app->onRepeat(repeat_interval_, [this]() {
+          reactesp::ReactESP::app->onRepeat(repeat_interval_, [this]() {
             tN2kMsg N2kMsg;
             SetN2kEngineDynamicParam(
                 N2kMsg, this->engine_instance_, this->oil_pressure_.get(),
-                this->oil_temperature_.get(), this->temperature_.get(),
-                this->alternator_potential_.get(), this->fuel_rate_.get(),
+                this->oil_temperature_.get(), this->coolant_temperature_.get(),
+                this->alternator_voltage_.get(), this->fuel_rate_.get(),
                 this->total_engine_hours_.get(), this->coolant_pressure_.get(),
                 this->fuel_pressure_.get(), this->engine_load_.get(),
                 this->engine_torque_.get(), this->get_engine_status_1(),
@@ -182,19 +195,20 @@ class N2kEngineParameterDynamicSender : public N2kSender {
   }
 
 // Define a macro for defining the consumer functions for each parameter.
-#define DEFINE_CONSUMER(name, type)      \
-  LambdaConsumer<type> name##_consumer_{ \
+#define DEFINE_CONSUMER(name, type)               \
+  sensesp::LambdaConsumer<type> name##_consumer_{ \
       [this](type value) { this->name##_.update(value); }};
   DEFINE_CONSUMER(oil_pressure, double)
   DEFINE_CONSUMER(oil_temperature, double)
-  DEFINE_CONSUMER(temperature, double)
-  DEFINE_CONSUMER(alternator_potential, double)
+  DEFINE_CONSUMER(coolant_temperature, double)
+  DEFINE_CONSUMER(alternator_voltage, double)
   DEFINE_CONSUMER(fuel_rate, double)
-  DEFINE_CONSUMER(total_engine_hours, uint32_t)
+  DEFINE_CONSUMER(total_engine_hours, double)
   DEFINE_CONSUMER(coolant_pressure, double)
   DEFINE_CONSUMER(fuel_pressure, double)
-  DEFINE_CONSUMER(engine_load, int)
-  DEFINE_CONSUMER(engine_torque, int)
+  DEFINE_CONSUMER(engine_load, int8_t)
+  DEFINE_CONSUMER(engine_torque, int8_t)
+  // Status bits 1
   DEFINE_CONSUMER(check_engine, bool)
   DEFINE_CONSUMER(over_temperature, bool)
   DEFINE_CONSUMER(low_oil_pressure, bool)
@@ -211,9 +225,10 @@ class N2kEngineParameterDynamicSender : public N2kSender {
   DEFINE_CONSUMER(egr_system, bool)
   DEFINE_CONSUMER(throttle_position_sensor, bool)
   DEFINE_CONSUMER(emergency_stop, bool)
+  // Status bits 2
   DEFINE_CONSUMER(warning_level_1, bool)
   DEFINE_CONSUMER(warning_level_2, bool)
-  DEFINE_CONSUMER(power_reduction, bool)
+  DEFINE_CONSUMER(low_oi_power_reduction, bool)
   DEFINE_CONSUMER(maintenance_needed, bool)
   DEFINE_CONSUMER(engine_comm_error, bool)
   DEFINE_CONSUMER(sub_or_secondary_throttle, bool)
@@ -221,7 +236,7 @@ class N2kEngineParameterDynamicSender : public N2kSender {
   DEFINE_CONSUMER(engine_shutting_down, bool)
 #undef DEFINE_CONSUMER
 
-  virtual String get_config_schema() override {
+  String get_config_schema() override {
     return R"###({
     "type": "object",
     "properties": {
@@ -230,12 +245,14 @@ class N2kEngineParameterDynamicSender : public N2kSender {
   })###";
   }
 
-  virtual bool set_configuration(const JsonObject& config) override {
-    String expected[] = {"engine_instance"};
-    for (auto str : expected) {
+  bool set_configuration(const JsonObject& config) override {
+    const String expected[] = {"engine_instance"};
+    for (const auto& str : expected) {
       if (!config.containsKey(str)) {
-        debugE("N2kEngineParameterRapidSender: Missing configuration key %s",
-               str.c_str());
+        debugE(
+            "N2kEngineParameterRapidSender: Missing configuration key "
+            "%s",
+            str.c_str());
         return false;
       }
     }
@@ -243,119 +260,141 @@ class N2kEngineParameterDynamicSender : public N2kSender {
     return true;
   }
 
-  virtual void get_configuration(JsonObject& config) override {
+  void get_configuration(JsonObject& config) override {
     config["engine_instance"] = engine_instance_;
   }
 
  protected:
-  Reaction* sender_reaction_ = nullptr;
+  sensesp::Reaction* sender_reaction_ = nullptr;
 
   tN2kEngineDiscreteStatus1 get_engine_status_1() {
-    uint16_t status = 0;
-    status |= 0x0001 * check_engine_.get();
-    status |= 0x0002 * over_temperature_.get();
-    status |= 0x0004 * low_oil_pressure_.get();
-    status |= 0x0008 * low_oil_level_.get();
-    status |= 0x0010 * low_fuel_pressure_.get();
-    status |= 0x0020 * low_system_voltage_.get();
-    status |= 0x0040 * low_coolant_level_.get();
-    status |= 0x0080 * water_flow_.get();
-    status |= 0x0100 * water_in_fuel_.get();
-    status |= 0x0200 * charge_indicator_.get();
-    status |= 0x0400 * preheat_indicator_.get();
-    status |= 0x0800 * high_boost_pressure_.get();
-    status |= 0x1000 * rev_limit_exceeded_.get();
-    status |= 0x2000 * egr_system_.get();
-    status |= 0x4000 * throttle_position_sensor_.get();
-    status |= 0x8000 * emergency_stop_.get();
+    tN2kEngineDiscreteStatus1 status1 = 0;
 
-    tN2kEngineDiscreteStatus1 status1;
-    status1.Status = status;
+    // Get the status from each of the sensor checks
+#if 1  // HACK HACK
+    uint16_t status_bits = 0;
+    status_bits |= 0x0001 * check_engine_.get();
+    status_bits |= 0x0002 * over_temperature_.get();
+    status_bits |= 0x0004 * low_oil_pressure_.get();
+    status_bits |= 0x0008 * low_oil_level_.get();
+    status_bits |= 0x0010 * low_fuel_pressure_.get();
+    status_bits |= 0x0020 * low_system_voltage_.get();
+    status_bits |= 0x0040 * low_coolant_level_.get();
+    status_bits |= 0x0080 * water_flow_.get();
+    status_bits |= 0x0100 * water_in_fuel_.get();
+    status_bits |= 0x0200 * charge_indicator_.get();
+    status_bits |= 0x0400 * preheat_indicator_.get();
+    status_bits |= 0x0800 * high_boost_pressure_.get();
+    status_bits |= 0x1000 * rev_limit_exceeded_.get();
+    status_bits |= 0x2000 * egr_system_.get();
+    status_bits |= 0x4000 * throttle_position_sensor_.get();
+    status_bits |= 0x8000 * emergency_stop_.get();
+    status1.Status = status_bits;
+#else
+    status1.Bits.CheckEngine = check_engine_.get();
+    status1.Bits.OverTemperature = over_temperature_.get();
+    status1.Bits.LowOilPressure = low_oil_pressure_.get();
+    status1.Bits.LowOilLevel = low_oil_level_.get();
+    status1.Bits.LowFuelPressure = low_fuel_pressure_.get();
+    status1.Bits.LowSystemVoltage = low_system_voltage_.get();
+    status1.Bits.LowCoolantLevel = low_coolant_level_.get();
+    status1.Bits.WaterFlow = water_flow_.get();
+    status1.Bits.WaterInFuel = water_in_fuel_.get();
+    status1.Bits.ChargeIndicator = charge_indicator_.get();
+    status1.Bits.PreheatIndicator = preheat_indicator_.get();
+    status1.Bits.HighBoostPressure = high_boost_pressure_.get();
+    status1.Bits.RevLimitExceeded = rev_limit_exceeded_.get();
+    status1.Bits.EGRSystem = egr_system_.get();
+    status1.Bits.ThrottlePositionSensor = throttle_position_sensor_.get();
+    status1.Bits.EngineEmergencyStopMode = emergency_stop_.get();
 
+    // Set CheckEngine if any other status bit is set
+    status1.Bits.CheckEngine =
+        status1.Bits.OverTemperature || status1.Bits.LowOilPressure ||
+        status1.Bits.LowOilLevel || status1.Bits.LowFuelPressure ||
+        status1.Bits.LowSystemVoltage || status1.Bits.LowCoolantLevel ||
+        status1.Bits.WaterFlow || status1.Bits.WaterInFuel ||
+        status1.Bits.ChargeIndicator || status1.Bits.PreheatIndicator ||
+        status1.Bits.HighBoostPressure || status1.Bits.RevLimitExceeded ||
+        status1.Bits.EGRSystem || status1.Bits.ThrottlePositionSensor ||
+        status1.Bits.EngineEmergencyStopMode;
+#endif
     return status1;
   }
 
   tN2kEngineDiscreteStatus2 get_engine_status_2() {
-    uint16_t status = 0;
-    status |= 0x0001 * warning_level_1_.get();
-    status |= 0x0002 * warning_level_2_.get();
-    status |= 0x0004 * power_reduction_.get();
-    status |= 0x0008 * maintenance_needed_.get();
-    status |= 0x0010 * engine_comm_error_.get();
-    status |= 0x0020 * sub_or_secondary_throttle_.get();
-    status |= 0x0040 * neutral_start_protect_.get();
-    status |= 0x0080 * engine_shutting_down_.get();
+    tN2kEngineDiscreteStatus2 status2 = 0;
 
-    tN2kEngineDiscreteStatus2 status2;
-    status2.Status = status;
-
+#if 1  // HACK HACK
+    uint16_t status_bits = 0;
+    status_bits |= 0x0001 * warning_level_1_.get();
+    status_bits |= 0x0002 * warning_level_2_.get();
+    status_bits |= 0x0004 * low_oi_power_reduction_.get();
+    status_bits |= 0x0008 * maintenance_needed_.get();
+    status_bits |= 0x0010 * engine_comm_error_.get();
+    status_bits |= 0x0020 * sub_or_secondary_throttle_.get();
+    status_bits |= 0x0040 * neutral_start_protect_.get();
+    status_bits |= 0x0080 * engine_shutting_down_.get();
+    status2.Status = status_bits;
+#else
+    status2.Bits.WarningLevel1 = warning_level_1_.get();
+    status2.Bits.WarningLevel2 = warning_level_2_.get();
+    status2.Bits.LowOiPowerReduction = low_oi_power_reduction_.get();
+    status2.Bits.MaintenanceNeeded = maintenance_needed_.get();
+    status2.Bits.EngineCommError = engine_comm_error_.get();
+    status2.Bits.SubOrSecondaryThrottle = sub_or_secondary_throttle_.get();
+    status2.Bits.NeutralStartProtect = neutral_start_protect_.get();
+    status2.Bits.EngineShuttingDown = engine_shutting_down_.get();
+#endif
     return status2;
   }
 
-  unsigned int repeat_interval_;
-  unsigned int expiry_;
+  uint32_t repeat_interval_;
+  uint32_t expiry_;
   tNMEA2000* nmea2000_;
 
   uint8_t engine_instance_;
   // Data to be transmitted
-  ExpiringValue<double> oil_pressure_;
-  ExpiringValue<double> oil_temperature_;
-  ExpiringValue<double> temperature_;
-  ExpiringValue<double> alternator_potential_;
-  ExpiringValue<double> fuel_rate_;
-  ExpiringValue<double> total_engine_hours_;
-  ExpiringValue<double> coolant_pressure_;
-  ExpiringValue<double> fuel_pressure_;
-  ExpiringValue<int8_t> engine_load_;
-  ExpiringValue<int8_t> engine_torque_;
+  sensesp::ExpiringValue<double> oil_pressure_;
+  sensesp::ExpiringValue<double> oil_temperature_;
+  sensesp::ExpiringValue<double> coolant_temperature_;
+  sensesp::ExpiringValue<double> alternator_voltage_;
+  sensesp::ExpiringValue<double> fuel_rate_;
+  sensesp::ExpiringValue<double> total_engine_hours_;
+  sensesp::ExpiringValue<double> coolant_pressure_;
+  sensesp::ExpiringValue<double> fuel_pressure_;
+  sensesp::ExpiringValue<int8_t> engine_load_;
+  sensesp::ExpiringValue<int8_t> engine_torque_;
   // Engine status 1 fields
-  ExpiringValue<bool> check_engine_;
-  ExpiringValue<bool> over_temperature_;
-  ExpiringValue<bool> low_oil_pressure_;
-  ExpiringValue<bool> low_oil_level_;
-  ExpiringValue<bool> low_fuel_pressure_;
-  ExpiringValue<bool> low_system_voltage_;
-  ExpiringValue<bool> low_coolant_level_;
-  ExpiringValue<bool> water_flow_;
-  ExpiringValue<bool> water_in_fuel_;
-  ExpiringValue<bool> charge_indicator_;
-  ExpiringValue<bool> preheat_indicator_;
-  ExpiringValue<bool> high_boost_pressure_;
-  ExpiringValue<bool> rev_limit_exceeded_;
-  ExpiringValue<bool> egr_system_;
-  ExpiringValue<bool> throttle_position_sensor_;
-  ExpiringValue<bool> emergency_stop_;
+  sensesp::ExpiringValue<bool> check_engine_;
+  sensesp::ExpiringValue<bool> over_temperature_;
+  sensesp::ExpiringValue<bool> low_oil_pressure_;
+  sensesp::ExpiringValue<bool> low_oil_level_;
+  sensesp::ExpiringValue<bool> low_fuel_pressure_;
+  sensesp::ExpiringValue<bool> low_system_voltage_;
+  sensesp::ExpiringValue<bool> low_coolant_level_;
+  sensesp::ExpiringValue<bool> water_flow_;
+  sensesp::ExpiringValue<bool> water_in_fuel_;
+  sensesp::ExpiringValue<bool> charge_indicator_;
+  sensesp::ExpiringValue<bool> preheat_indicator_;
+  sensesp::ExpiringValue<bool> high_boost_pressure_;
+  sensesp::ExpiringValue<bool> rev_limit_exceeded_;
+  sensesp::ExpiringValue<bool> egr_system_;
+  sensesp::ExpiringValue<bool> throttle_position_sensor_;
+  sensesp::ExpiringValue<bool> emergency_stop_;
   // Engine status 2 fields
-  ExpiringValue<bool> warning_level_1_;
-  ExpiringValue<bool> warning_level_2_;
-  ExpiringValue<bool> power_reduction_;
-  ExpiringValue<bool> maintenance_needed_;
-  ExpiringValue<bool> engine_comm_error_;
-  ExpiringValue<bool> sub_or_secondary_throttle_;
-  ExpiringValue<bool> neutral_start_protect_;
-  ExpiringValue<bool> engine_shutting_down_;
+  sensesp::ExpiringValue<bool> warning_level_1_;
+  sensesp::ExpiringValue<bool> warning_level_2_;
+  sensesp::ExpiringValue<bool> low_oi_power_reduction_;
+  sensesp::ExpiringValue<bool> maintenance_needed_;
+  sensesp::ExpiringValue<bool> engine_comm_error_;
+  sensesp::ExpiringValue<bool> sub_or_secondary_throttle_;
+  sensesp::ExpiringValue<bool> neutral_start_protect_;
+  sensesp::ExpiringValue<bool> engine_shutting_down_;
 };
 
 const char kN2kFluidLevelTankTypes[][12] = {
     "Fuel", "Water", "Gray water", "Live well", "Oil", "Black water"};
-
-const char kN2kTemperatureSourceTypes[][35] = {
-    "Sea Temperature",
-    "Outside Temperature",
-    "Inside Temperature",
-    "Engine Room Temperature",
-    "Main Cabin Temperature",
-    "Live Well Temperature",
-    "Bait Well Temperature",
-    "Refrigeration Temperature",
-    "Heating System Temperature",
-    "Dew Point Temperature",
-    "Apparent Wind Chill Temperature",
-    "Theoretical Wind Chill Temperature",
-    "Heat Index Temperature",
-    "Freezer Temperature",
-    "Exhaust Gas Temperature",
-    "Shaft Seal Temperature"};
 
 /**
  * @brief Transmit NMEA 2000 PGN 127505: Fluid Level
@@ -363,7 +402,7 @@ const char kN2kTemperatureSourceTypes[][35] = {
  */
 class N2kFluidLevelSender : public N2kSender {
  public:
-  N2kFluidLevelSender(String config_path, uint8_t tank_instance,
+  N2kFluidLevelSender(const String& config_path, uint8_t tank_instance,
                       tN2kFluidType tank_type, double tank_capacity,
                       tNMEA2000* nmea2000, bool enable = true)
       : N2kSender{config_path},
@@ -374,7 +413,8 @@ class N2kFluidLevelSender : public N2kSender {
         repeat_interval_{2500},  // In ms. Dictated by NMEA 2000 standard!
         expiry_{10000}           // In ms. When the inputs expire.
   {
-    tank_level_ = ExpiringValue<double>(N2kDoubleNA, expiry_, N2kDoubleNA);
+    tank_level_ =
+        sensesp::ExpiringValue<double>(N2kDoubleNA, expiry_, N2kDoubleNA);
     if (enable) {
       this->enable();
     }
@@ -383,10 +423,10 @@ class N2kFluidLevelSender : public N2kSender {
   void enable() override {
     if (this->sender_reaction_ == nullptr) {
       this->sender_reaction_ =
-          ReactESP::app->onRepeat(repeat_interval_, [this]() {
+          reactesp::ReactESP::app->onRepeat(repeat_interval_, [this]() {
             tN2kMsg N2kMsg;
-            // At the moment, the PGN is sent regardless of whether all the
-            // values are invalid or not.
+            // At the moment, the PGN is sent regardless of whether all
+            // the values are invalid or not.
             SetN2kFluidLevel(N2kMsg, this->tank_instance_, this->tank_type_,
                              this->tank_level_.get(), this->tank_capacity_);
             this->nmea2000_->SendMsg(N2kMsg);
@@ -394,12 +434,12 @@ class N2kFluidLevelSender : public N2kSender {
     }
   }
 
-  LambdaConsumer<double> tank_level_consumer_{[this](double value) {
+  sensesp::LambdaConsumer<double> tank_level_consumer_{[this](double value) {
     // Internal tank level is a ratio, NMEA 2000 wants a percentage.
     this->tank_level_.update(100. * value);
   }};
 
-  virtual String get_config_schema() override {
+  String get_config_schema() override {
     String schema_template = R"###({
   "type": "object",
   "properties": {
@@ -427,9 +467,9 @@ class N2kFluidLevelSender : public N2kSender {
 })###";
 
     String fluid_types;
-    for (int i = 0; i < sizeof(kN2kFluidLevelTankTypes) / 12; i++) {
-      fluid_types += "\"" + String(kN2kFluidLevelTankTypes[i]) + "\"";
-      if (i < sizeof(kN2kFluidLevelTankTypes) / 12 - 1) {
+    for (int ii = 0; ii < sizeof(kN2kFluidLevelTankTypes) / 12; ii++) {
+      fluid_types += "\"" + String(kN2kFluidLevelTankTypes[ii]) + "\"";
+      if (ii < sizeof(kN2kFluidLevelTankTypes) / 12 - 1) {
         fluid_types += ",";
       }
     }
@@ -437,9 +477,9 @@ class N2kFluidLevelSender : public N2kSender {
     return schema_template;
   };
 
-  virtual bool set_configuration(const JsonObject& config) override {
-    String expected[] = {"tank_instance", "tank_type", "tank_capacity"};
-    for (auto str : expected) {
+  bool set_configuration(const JsonObject& config) override {
+    const String expected[] = {"tank_instance", "tank_type", "tank_capacity"};
+    for (const auto& str : expected) {
       if (!config.containsKey(str)) {
         debugE("N2kFluidLevelSender: Missing configuration key %s",
                str.c_str());
@@ -447,10 +487,10 @@ class N2kFluidLevelSender : public N2kSender {
       }
     }
     tank_instance_ = config["tank_instance"];
-    String tank_type_str = config["tank_type"];
-    for (int i = 0; i < sizeof(kN2kFluidLevelTankTypes) / 12; i++) {
-      if (tank_type_str == kN2kFluidLevelTankTypes[i]) {
-        tank_type_ = (tN2kFluidType)i;
+    const String& tank_type_str = config["tank_type"];
+    for (int ii = 0; ii < sizeof(kN2kFluidLevelTankTypes) / 12; ii++) {
+      if (tank_type_str == kN2kFluidLevelTankTypes[ii]) {
+        tank_type_ = (tN2kFluidType)ii;
         break;
       }
     }
@@ -458,26 +498,49 @@ class N2kFluidLevelSender : public N2kSender {
     return true;
   }
 
-  virtual void get_configuration(JsonObject& config) override {
+  void get_configuration(JsonObject& config) override {
     config["tank_instance"] = tank_instance_;
     config["tank_type"] = kN2kFluidLevelTankTypes[tank_type_];
     config["tank_capacity"] = tank_capacity_;
   }
 
  protected:
-  unsigned int repeat_interval_;
-  unsigned int expiry_;
+  uint32_t repeat_interval_;
+  uint32_t expiry_;
   tNMEA2000* nmea2000_;
 
   uint8_t tank_instance_;
   tN2kFluidType tank_type_;
-  double tank_capacity_;              // in liters
-  ExpiringValue<double> tank_level_;  // in percent
+  double tank_capacity_;                       // in liters
+  sensesp::ExpiringValue<double> tank_level_;  // in percent
 };
 
+const char kN2kTemperatureSourceTypes[][35] = {
+    "Sea Temperature",
+    "Outside Temperature",
+    "Inside Temperature",
+    "Engine Room Temperature",
+    "Main Cabin Temperature",
+    "Live Well Temperature",
+    "Bait Well Temperature",
+    "Refrigeration Temperature",
+    "Heating System Temperature",
+    "Dew Point Temperature",
+    "Apparent Wind Chill Temperature",
+    "Theoretical Wind Chill Temperature",
+    "Heat Index Temperature",
+    "Freezer Temperature",
+    "Exhaust Gas Temperature",
+    "Shaft Seal Temperature"};
+
+/**
+ * @brief Transmit NMEA 2000 PGN 130316: Temperature, Extended Range
+ *
+ */
 class N2kTemperatureExtSender : public N2kSender {
  public:
-  N2kTemperatureExtSender(String config_path, uint8_t temperature_instance,
+  N2kTemperatureExtSender(const String& config_path,
+                          uint8_t temperature_instance,
                           tN2kTempSource temperature_source,
                           tNMEA2000* nmea2000, bool enable = true)
       : N2kSender{config_path},
@@ -487,7 +550,8 @@ class N2kTemperatureExtSender : public N2kSender {
         repeat_interval_{2000},  // In ms. Dictated by NMEA 2000 standard!
         expiry_{10000}           // In ms. When the inputs expire.
   {
-    temperature_ = ExpiringValue<double>(N2kDoubleNA, expiry_, N2kDoubleNA);
+    temperature_ =
+        sensesp::ExpiringValue<double>(N2kDoubleNA, expiry_, N2kDoubleNA);
     if (enable) {
       this->enable();
     }
@@ -496,10 +560,10 @@ class N2kTemperatureExtSender : public N2kSender {
   void enable() override {
     if (this->sender_reaction_ == nullptr) {
       this->sender_reaction_ =
-          ReactESP::app->onRepeat(repeat_interval_, [this]() {
+          reactesp::ReactESP::app->onRepeat(repeat_interval_, [this]() {
             tN2kMsg N2kMsg;
-            // At the moment, the PGN is sent regardless of whether all the
-            // values are invalid or not.
+            // At the moment, the PGN is sent regardless of whether all
+            // the values are invalid or not.
             SetN2kTemperatureExt(N2kMsg, 255, this->temperature_instance_,
                                  this->temperature_source_,
                                  this->temperature_.get(), N2kDoubleNA);
@@ -508,10 +572,10 @@ class N2kTemperatureExtSender : public N2kSender {
     }
   }
 
-  LambdaConsumer<double> temperature_consumer_{
+  sensesp::LambdaConsumer<double> temperature_consumer_{
       [this](double value) { this->temperature_.update(value); }};
 
-  virtual String get_config_schema() override {
+  String get_config_schema() override {
     String schema_template = R"###({
   "type": "object",
   "properties": {
@@ -535,9 +599,9 @@ class N2kTemperatureExtSender : public N2kSender {
 })###";
 
     String fluid_types;
-    for (int i = 0; i < sizeof(kN2kTemperatureSourceTypes) / 35; i++) {
-      fluid_types += "\"" + String(kN2kTemperatureSourceTypes[i]) + "\"";
-      if (i < sizeof(kN2kTemperatureSourceTypes) / 35 - 1) {
+    for (int ii = 0; ii < sizeof(kN2kTemperatureSourceTypes) / 35; ii++) {
+      fluid_types += "\"" + String(kN2kTemperatureSourceTypes[ii]) + "\"";
+      if (ii < sizeof(kN2kTemperatureSourceTypes) / 35 - 1) {
         fluid_types += ",";
       }
     }
@@ -545,9 +609,9 @@ class N2kTemperatureExtSender : public N2kSender {
     return schema_template;
   };
 
-  virtual bool set_configuration(const JsonObject& config) override {
-    String expected[] = {"temperature_instance", "temperature_source"};
-    for (auto str : expected) {
+  bool set_configuration(const JsonObject& config) override {
+    const String expected[] = {"temperature_instance", "temperature_source"};
+    for (const auto& str : expected) {
       if (!config.containsKey(str)) {
         debugE("N2kTemperatureExtSender: Missing configuration key %s",
                str.c_str());
@@ -555,32 +619,34 @@ class N2kTemperatureExtSender : public N2kSender {
       }
     }
     temperature_instance_ = config["temperature_instance"];
-    String temperature_source_str = config["temperature_source"];
-    for (int i = 0; i < sizeof(kN2kTemperatureSourceTypes) / 35; i++) {
-      if (temperature_source_str == kN2kTemperatureSourceTypes[i]) {
-        temperature_source_ = (tN2kTempSource)i;
+    const String& temperature_source_str = config["temperature_source"];
+    for (int ii = 0; ii < sizeof(kN2kTemperatureSourceTypes) / 35; ii++) {
+      if (temperature_source_str == kN2kTemperatureSourceTypes[ii]) {
+        temperature_source_ = (tN2kTempSource)ii;
         break;
       }
     }
     return true;
   }
 
-  virtual void get_configuration(JsonObject& config) override {
+  void get_configuration(JsonObject& config) override {
     config["temperature_instance"] = temperature_instance_;
     config["temperature_source"] =
         kN2kTemperatureSourceTypes[temperature_source_];
   }
 
  protected:
-  unsigned int repeat_interval_;
-  unsigned int expiry_;
+  uint32_t repeat_interval_;
+  uint32_t expiry_;
   tNMEA2000* nmea2000_;
 
   uint8_t temperature_instance_;
   tN2kTempSource temperature_source_;
-  ExpiringValue<double> temperature_;  // in percent
+  sensesp::ExpiringValue<double> temperature_;  // in percent
 };
 
-}  // namespace sensesp
+}  // namespace halmet
+
+#endif
 
 #endif  // HALMET_SRC_N2K_SENDERS_H_
